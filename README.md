@@ -14,13 +14,13 @@ npm run build    # production build in dist/
 
 - **Text and links:** `src/content.ts` (about, languages, AI/ML, projects, SAP, internship, captions).
 - **Resume:** drop `public/resume.pdf`; the download buttons hide when it is missing.
-- **Scroll timing:** the `HOOK` … `BOOT` constants at the top of `src/Scene.tsx`; overall scroll length is `.track` in `src/styles.css`.
+- **Scroll, camera, colours:** the TUNING block at the top of `src/Scene.tsx`: `SCROLL_VH` (total scroll length), `BEATS` (scroll share per beat), `SHOTS` (camera per beat) and `COLORS` (glow colour per beat).
 
 A plain HTML version (`src/Simple.tsx`) is used when WebGL is unavailable, when reduced motion is set, or after clicking **Skip 3D**.
 
 ## Credits
 
-Built with [three.js](https://threejs.org), [React Three Fiber](https://github.com/pmndrs/react-three-fiber) and [drei](https://github.com/pmndrs/drei), [GSAP](https://gsap.com) + ScrollTrigger, [Lenis](https://lenis.darkroom.engineering), [Vite](https://vite.dev). Fonts: Inter and JetBrains Mono (SIL OFL), self-hosted via [Fontsource](https://fontsource.org). All 3D parts are built from primitives with canvas-generated textures.
+Built with [three.js](https://threejs.org), [React Three Fiber](https://github.com/pmndrs/react-three-fiber) and [drei](https://github.com/pmndrs/drei), [GSAP](https://gsap.com) + ScrollTrigger, [Lenis](https://lenis.darkroom.engineering), [Vite](https://vite.dev). Fonts: Inter and JetBrains Mono (SIL OFL), self-hosted via [Fontsource](https://fontsource.org). All 3D parts, the background and the effects are built from primitives, small shaders and canvas-generated textures; no model files or postprocessing.
 
 ## License
 
