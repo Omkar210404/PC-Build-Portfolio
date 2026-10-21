@@ -1,5 +1,7 @@
 node_modules/
 dist/
 .claude/
+.env*
+.tmp-models/
 *.log
 .DS_Store

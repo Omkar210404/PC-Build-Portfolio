@@ -1,0 +1,38 @@
+[
+  {
+    "part": "motherboard",
+    "uid": "25b3659935774b1e9d73d8954be065d8",
+    "title": "X570 Prime motherboard [HQ PBR]",
+    "author": "Igor.Jop",
+    "authorUrl": "https://sketchfab.com/Igor.Jop",
+    "licence": "CC Attribution",
+    "licenceUrl": "http://creativecommons.org/licenses/by/4.0/",
+    "source": "https://sketchfab.com/3d-models/x570-prime-motherboard-hq-pbr-25b3659935774b1e9d73d8954be065d8",
+    "faces": 34961,
+    "bytes": 760416
+  },
+  {
+    "part": "gpu",
+    "uid": "e5c384afae914d548a591f722e1878fc",
+    "title": "MSI RTX 3080 Graphics card",
+    "author": "Kaif.3D",
+    "authorUrl": "https://sketchfab.com/kaif.3d",
+    "licence": "CC Attribution",
+    "licenceUrl": "http://creativecommons.org/licenses/by/4.0/",
+    "source": "https://sketchfab.com/3d-models/msi-rtx-3080-graphics-card-e5c384afae914d548a591f722e1878fc",
+    "faces": 21897,
+    "bytes": 753952
+  },
+  {
+    "part": "ram",
+    "uid": "1fce4935471e46cab6ee57ba140c87f9",
+    "title": "Crucial BALLISTIX 8GB DDR4 3600 RAM | Black",
+    "author": "BlackCube",
+    "authorUrl": "https://sketchfab.com/blackcube4",
+    "licence": "CC Attribution",
+    "licenceUrl": "http://creativecommons.org/licenses/by/4.0/",
+    "source": "https://sketchfab.com/3d-models/crucial-ballistix-8gb-ddr4-3600-ram-black-1fce4935471e46cab6ee57ba140c87f9",
+    "faces": 5350,
+    "bytes": 223436
+  }
+]
