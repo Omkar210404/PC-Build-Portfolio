@@ -51,7 +51,7 @@ function Experience({ name, touch, hasResume, onSkip }: {
   const [section, setSection] = useState<Section>('hook')
   const [fontsReady, setFontsReady] = useState(false)
   const [sceneReady, setSceneReady] = useState(false)
-  const [active, setActive] = useState<number | null>(null)
+  const [active, setActive] = useState<string | null>(null)
   const closeTimer = useRef<number | undefined>(undefined)
 
   // Canvas textures need the self-hosted fonts loaded first (with a timeout fallback)
@@ -103,10 +103,10 @@ function Experience({ name, touch, hasResume, onSkip }: {
   }, [])
 
   // Hover opens instantly; leaving closes after a short delay so the panel link can be reached
-  const onHover = useCallback((i: number | null) => {
+  const onHover = useCallback((k: string | null) => {
     window.clearTimeout(closeTimer.current)
-    if (i === null) closeTimer.current = window.setTimeout(() => setActive(null), 350)
-    else setActive(i)
+    if (k === null) closeTimer.current = window.setTimeout(() => setActive(null), 350)
+    else setActive(k)
   }, [])
   const keepOpen = useCallback(() => window.clearTimeout(closeTimer.current), [])
   const onReady = useCallback(() => setSceneReady(true), [])
@@ -134,7 +134,6 @@ function Experience({ name, touch, hasResume, onSkip }: {
       <div className="vignette" />
       <div ref={track} className="track" />
       <Overlay
-        name={name}
         section={section}
         active={active}
         setActive={setActive}
