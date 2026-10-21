@@ -4,7 +4,22 @@ An interactive, scroll-driven 3D portfolio. A PC assembles itself in real time a
 
 Built by **Omkar Satish Nikam**, Computer Engineering graduate (University of Mumbai, 2026), working in AI/ML, Python and SAP MM.
 
-[GitHub](https://github.com/Omkar210404) · [LinkedIn](https://www.linkedin.com/in/omkar-nikam-6431282b4/) · omkarnikamofficial21@gmail.com
+**[Live demo](https://omkar210404.github.io/PC-Build-Portfolio/)** · [GitHub](https://github.com/Omkar210404) · [LinkedIn](https://www.linkedin.com/in/omkar-nikam-6431282b4/) · omkarnikamofficial21@gmail.com
+
+![The exploded PC hovering above the board at the start of the scroll](docs/hook.jpg)
+
+## Screenshots
+
+| | |
+|---|---|
+| ![RAM sticks with language labels seated in their slots](docs/ram.jpg) | ![GPU installed in the PCIe slot with its fans facing the camera](docs/gpu.jpg) |
+| **RAM:** languages | **GPU:** AI/ML focus |
+| ![Project SSDs on the board with a project panel open](docs/projects.jpg) | ![Power cables glowing with energy pulses and the board traces lit](docs/power.jpg) |
+| **SSDs:** projects (hover or tap) | **Power:** SAP experience |
+| ![Finished build with RGB, the boot screen and the BIOS-style contact form](docs/boot.jpg) | ![Mobile layout during the power section](docs/mobile.jpg) |
+| **Boot:** contact form | **Mobile** |
+
+Tip: add `?for=YourName` to the URL and the POST display greets you by name.
 
 ## The story
 
@@ -45,7 +60,7 @@ npm run build    # production build in dist/
 npm run preview  # serve the production build
 ```
 
-The build uses relative paths, so `dist/` can be hosted from any static host or sub-path (for example GitHub Pages).
+The build uses relative paths, so `dist/` can be hosted from any static host or sub-path. Every push to `main` rebuilds the live demo on GitHub Pages via `.github/workflows/deploy.yml`.
 
 ## Project structure
 
@@ -60,6 +75,7 @@ src/
   Simple.tsx     plain HTML version
 public/models/   optimised .glb models + models.json (credits metadata)
 scripts/         fetch-models.mjs (finds, downloads and optimises the models)
+docs/            README screenshots
 ```
 
 ## Customise
