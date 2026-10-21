@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type RefObject } from 'react'
+import { useEffect, useState, type FormEvent, type RefObject } from 'react'
 import type { Section } from './Scene'
 import { aiml, internship, languages, person, projects, sap, sections, ui } from './content'
 
@@ -39,6 +39,30 @@ export function ContactForm() {
         <a href={`mailto:${person.email}`}>{person.email}</a>
       </div>
     </form>
+  )
+}
+
+// 3D model credits (CC BY needs attribution), read from public/models/models.json written by the fetch script
+type Credit = { title: string; author: string; licence: string; licenceUrl: string | null; source: string }
+export function ModelCredits() {
+  const [list, setList] = useState<Credit[]>([])
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}models/models.json`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((all: Credit[]) => setList(all.filter((c) => c.licence === 'CC Attribution')))
+      .catch(() => setList([]))
+  }, [])
+  if (!list.length) return null
+  return (
+    <p className="credits">
+      3D models:{' '}
+      {list.map((c, i) => (
+        <span key={c.source}>
+          {i > 0 && ' · '}
+          <a href={c.source} target="_blank" rel="noreferrer">{c.title}</a> by {c.author} ({c.licenceUrl ? <a href={c.licenceUrl} target="_blank" rel="noreferrer">CC BY 4.0</a> : c.licence})
+        </span>
+      ))}
+    </p>
   )
 }
 
@@ -156,6 +180,8 @@ export default function Overlay(p: Props) {
       )}
 
       {p.section === 'contact' && <ContactForm />}
+
+      <ModelCredits />
 
       <nav className="dock" aria-label="Quick links">
         {p.hasResume && <a href={person.resume} download>Resume</a>}

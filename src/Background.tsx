@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { useFrame, type ThreeElements } from '@react-three/fiber'
 import * as THREE from 'three'
-import { GLOW, V, canvasTex } from './Parts'
+import { FxLayer, GLOW, V, canvasTex } from './Parts'
 
 const additive = { transparent: true, blending: THREE.AdditiveBlending, depthWrite: false } as const
 const VERT_UV = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }'
@@ -198,12 +198,15 @@ export default function Background({ touch }: { touch: boolean }) {
     <>
       <color attach="background" args={['#070b16']} />
       <fog attach="fog" args={['#070b16', 6, 16]} />
-      <Grid axis="xy" position={[0.3, 2, -5]} />
-      <Grid axis="xz" position={[0.3, -1.2, -1]} rotation-x={-Math.PI / 2} />
-      <Glows />
-      <Shafts />
-      <Dust count={touch ? 160 : 650} />
-      <Streaks count={touch ? 30 : 110} />
+      {/* layer 1: seen by the camera, ignored by contact shadows */}
+      <FxLayer>
+        <Grid axis="xy" position={[0.3, 2, -5]} />
+        <Grid axis="xz" position={[0.3, -1.2, -1]} rotation-x={-Math.PI / 2} />
+        <Glows />
+        <Shafts />
+        <Dust count={touch ? 160 : 650} />
+        <Streaks count={touch ? 30 : 110} />
+      </FxLayer>
       <Desk />
     </>
   )

@@ -1,5 +1,5 @@
 import { aiml, languages, person, projects, ui } from './content'
-import { ContactForm, SapList } from './Overlay'
+import { ContactForm, ModelCredits, SapList } from './Overlay'
 
 // Plain, fast HTML version. Used when WebGL is missing, reduced motion is set, or "Skip 3D" is clicked.
 export default function Simple({ hasResume, canView3d, onView3d }: {
@@ -48,6 +48,7 @@ export default function Simple({ hasResume, canView3d, onView3d }: {
         <h2>Contact</h2>
         <ContactForm />
       </section>
+      <footer><ModelCredits /></footer>
     </main>
   )
 }

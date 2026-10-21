@@ -151,3 +151,9 @@ button { font: inherit; cursor: pointer; }
 .cards h3 { margin: 0 0 4px; }
 .cards p { margin: 0 0 8px; color: #c5c8d0; }
 .simple .bios { position: static; transform: none; animation: none; width: 100%; max-height: none; }
+
+/* 3D model credits (CC BY attribution) */
+.credits { position: absolute; right: 16px; bottom: 26px; margin: 0; max-width: min(460px, 40vw); font-size: 10px; line-height: 1.5; color: var(--muted); text-align: right; opacity: 0.75; }
+.credits a { color: inherit; }
+@media (max-width: 700px) { .credits { left: 16px; right: 112px; top: 40px; bottom: auto; max-width: none; text-align: left; font-size: 8px; } }
+.simple footer .credits { position: static; max-width: none; text-align: left; margin-top: 48px; font-size: 12px; }

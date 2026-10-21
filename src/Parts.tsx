@@ -1,26 +1,36 @@
-// All PC parts, the shared per-frame state, and snap-in impact effects.
+// PC parts (primitives + wrappers that hold the 3D models), shared per-frame state, and snap-in impacts.
 import { useMemo, useRef, type ReactNode } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { aiml, languages, person, projects, sap, ui } from './content'
 
-// ---------- layout (world units; desk top y = 0, board top y = B) ----------
+// ---------- layout (world units; desk top y = 0, PCB top y = B) ----------
+// The board footprint and every slot position below were measured on public/models/motherboard.glb
+// (X570 Prime) and mapped with BOARD: model scaled by BOARD.scale, model +Y -> world -Z, bbox centre at x/z.
+// The primitive fallback board uses the same numbers, so parts land on their slots either way.
+export const BOARD = { x: -0.2, z: -0.05, w: 1.166, d: 1.452, scale: 0.45 }
 export const B = 0.1
-export const SOCKET = { x: -0.25, z: -0.3 }
-export const RAM_X = [0.04, 0.115, 0.19, 0.265]
-export const RAM_Z = -0.3
-export const PCIE_Z = 0.12
+export const SOCKET = { x: -0.292, z: -0.325, seat: 0.135, w: 0.265, d: 0.222 }
+export const RAM_X = [0.131, 0.181, 0.226, 0.273]
+export const RAM_Z = -0.339
+export const RAM_H = 0.18 // stick height (the RAM model is scaled to this)
+export const RAM_SEAT = 0.128 // stick bottom, connector sunk into the slot
+export const PCIE = { x: -0.299, z: 0.09, top: 0.162, len: 0.548 }
+export const GPU_SIZE = { len: 1.2, h: 0.48, t: 0.2 } // the GPU model is scaled to len
+export const ATX24 = { x: 0.361, z: -0.262, top: 0.18 }
+export const EPS8 = { x: -0.49, z: -0.753, top: 0.174 }
 export const N_SSD = Math.min(projects.length, 6)
 const SSD_COLS = N_SSD <= 3 ? N_SSD : Math.ceil(N_SSD / 2)
-export const ssdSlot = (i: number) => ({ x: -0.45 + (i % SSD_COLS) * 0.42, z: 0.36 + Math.floor(i / SSD_COLS) * 0.16 })
+export const SSD_Y = 0.175 // drives rest on top of the lower slots
+export const ssdSlot = (i: number) => ({ x: -0.6 + (i % SSD_COLS) * 0.4, z: 0.36 + Math.floor(i / SSD_COLS) * 0.17 })
 export const PSU = { x: 1.0, y: 0.22, z: 0.5 }
 
 // Power cables: PSU -> connector. The last point of each curve is the connector.
 const CABLES = [
-  [[0.84, 0.36, 0.32], [0.86, 0.45, 0.02], [0.72, 0.3, -0.05], [0.63, 0.17, -0.05]], // 24-pin ATX
-  [[0.92, 0.36, 0.3], [1.08, 0.42, -0.2], [0.9, 0.45, -0.72], [-0.1, 0.45, -0.76], [-0.55, 0.3, -0.68], [-0.55, 0.17, -0.6]], // CPU 8-pin
-  [[0.82, 0.36, 0.45], [0.6, 0.72, 0.32], [0.3, 0.72, 0.12], [0.2, 0.6, 0.08]], // GPU PCIe
+  [[0.84, 0.36, 0.32], [0.72, 0.42, 0.0], [0.5, 0.32, -0.26], [ATX24.x + 0.01, ATX24.top + 0.02, ATX24.z]], // 24-pin ATX
+  [[0.92, 0.36, 0.3], [1.08, 0.42, -0.2], [0.9, 0.45, -0.78], [-0.1, 0.45, -0.8], [EPS8.x, 0.3, -0.8], [EPS8.x, EPS8.top + 0.02, EPS8.z]], // CPU 8-pin
+  [[0.82, 0.36, 0.45], [0.75, 0.78, 0.3], [0.5, 0.8, 0.12], [0.36, GPU_SIZE.h + 0.17, PCIE.z]], // GPU PCIe
 ].map((pts) => new THREE.CatmullRomCurve3(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z))))
 
 // Shared per-frame state. GSAP writes it (scrubbed by scroll), useFrame reads it directly.
@@ -43,11 +53,11 @@ const WHITE = new THREE.Color('#ffffff')
 
 // Snap-in impacts: ring shockwave + flash + sparks at each connection point
 export const IMPACTS: { k: string; pos: number[]; size: number }[] = [
-  { k: 'fx_cpu', pos: [SOCKET.x, B + 0.04, SOCKET.z], size: 0.25 },
-  { k: 'fx_cooler', pos: [SOCKET.x, B + 0.3, SOCKET.z], size: 0.22 },
-  ...RAM_X.map((x, i) => ({ k: `fx_ram${i}`, pos: [x, B + 0.17, RAM_Z], size: 0.2 })),
-  { k: 'fx_gpu', pos: [-0.15, B + 0.46, PCIE_Z + 0.02], size: 0.45 },
-  ...Array.from({ length: N_SSD }, (_, i) => ({ k: `fx_ssd${i}`, pos: [ssdSlot(i).x, B + 0.035, ssdSlot(i).z], size: 0.22 })),
+  { k: 'fx_cpu', pos: [SOCKET.x, SOCKET.seat + 0.03, SOCKET.z], size: 0.22 },
+  { k: 'fx_cooler', pos: [SOCKET.x, SOCKET.seat + 0.25, SOCKET.z], size: 0.22 },
+  ...RAM_X.map((x, i) => ({ k: `fx_ram${i}`, pos: [x, RAM_SEAT + RAM_H, RAM_Z], size: 0.18 })),
+  { k: 'fx_gpu', pos: [0, GPU_SIZE.h + 0.16, PCIE.z], size: 0.45 },
+  ...Array.from({ length: N_SSD }, (_, i) => ({ k: `fx_ssd${i}`, pos: [ssdSlot(i).x, SSD_Y + 0.01, ssdSlot(i).z], size: 0.22 })),
   { k: 'fx_psu', pos: [PSU.x, PSU.y + 0.18, PSU.z], size: 0.3 },
   ...CABLES.map((c, i) => ({ k: `fx_c${i}`, pos: c.points[c.points.length - 1].toArray(), size: 0.2 })),
   { k: 'fx_glass', pos: [0.225, 0.72, 0.025], size: 1.1 },
@@ -76,6 +86,16 @@ const DARK = new THREE.Color('#111318')
 const HUE = new THREE.Color()
 const LED_MAT = new THREE.MeshBasicMaterial({ color: ACCENT, toneMapped: false })
 
+// Puts decorative objects on layer 1 (seen by the main camera, ignored by contact shadows)
+export function FxLayer({ children }: { children: ReactNode }) {
+  const ref = useRef<THREE.Group>(null)
+  useFrame(() => {
+    const g = ref.current
+    if (g && !g.userData.fx) { g.traverse((o) => o.layers.set(1)); g.userData.fx = true }
+  })
+  return <group ref={ref}>{children}</group>
+}
+
 // A part that hovers exploded and moves to its installed transform as S[key] goes 0 -> 1
 function Part({ k, from, to, fromRot = [0, 0, 0], toRot = [0, 0, 0], seed = 0, children, ...events }: {
   k: string; from: number[]; to: number[]; fromRot?: number[]; toRot?: number[]; seed?: number; children: ReactNode
@@ -102,18 +122,18 @@ function Fan({ r, speed, rgb }: { r: number; speed: () => number; rgb?: number }
   return (
     <group>
       <mesh rotation-x={Math.PI / 2}>
-        <torusGeometry args={[r, r * 0.08, 6, 28]} />
+        <torusGeometry args={[r, r * 0.08, 8, 32]} />
         {rgb !== undefined ? <primitive object={RGB_MATS[rgb]} attach="material" /> : <meshStandardMaterial color="#1b1e25" />}
       </mesh>
       <group ref={blades}>
         <mesh>
-          <cylinderGeometry args={[r * 0.28, r * 0.28, r * 0.2, 16]} />
-          <meshStandardMaterial color="#20232b" roughness={0.4} />
+          <cylinderGeometry args={[r * 0.28, r * 0.28, r * 0.2, 20]} />
+          <meshStandardMaterial color="#20232b" roughness={0.35} metalness={0.3} />
         </mesh>
         {Array.from({ length: 7 }, (_, i) => (
           <mesh key={i} rotation={[0.35, (i / 7) * Math.PI * 2, 0, 'YXZ']} position={[Math.cos((i / 7) * Math.PI * 2) * r * 0.55, 0, -Math.sin((i / 7) * Math.PI * 2) * r * 0.55]}>
             <boxGeometry args={[r * 0.62, 0.006, r * 0.3]} />
-            <meshStandardMaterial color="#2a2e38" roughness={0.5} />
+            <meshStandardMaterial color="#2a2e38" roughness={0.45} />
           </mesh>
         ))}
       </group>
@@ -121,8 +141,7 @@ function Fan({ r, speed, rgb }: { r: number; speed: () => number; rgb?: number }
   )
 }
 
-// ---------- motherboard: base texture + glowing circuit-trace overlay ----------
-// Trace polylines are generated once so the glow layer can light them up.
+// ---------- circuit-trace glow layer (dim at rest; a power-up wave spreads from the power connectors) ----------
 const TRACES = Array.from({ length: 420 }, () => {
   const dirs = [[1, 0], [0, 1], [1, 1], [1, -1], [-1, 0], [0, -1]]
   let x = Math.round((Math.random() * 1024) / 8) * 8
@@ -137,20 +156,10 @@ const TRACES = Array.from({ length: 420 }, () => {
   }
   return { pts, w: Math.random() < 0.2 ? 3 : 1.5, a: 0.4 + Math.random() * 0.6 }
 })
+const boardUv = (x: number, z: number) => new THREE.Vector2((x - BOARD.x) / BOARD.w + 0.5, 0.5 - (z - BOARD.z) / BOARD.d)
 
-function useBoardTextures() {
-  return useMemo(() => {
-    const base = canvasTex(1024, 1024, (g) => {
-      g.fillStyle = '#0c1a1f'
-      g.fillRect(0, 0, 1024, 1024)
-      g.fillStyle = 'rgba(230,230,220,0.5)'
-      g.font = '600 22px "JetBrains Mono", monospace'
-      g.fillText('PART-OF-ME  REV 1.0', 40, 990)
-      g.fillText('CPU_SOCKET', 210, 140)
-      g.fillText('DIMM_A1..B2', 560, 120)
-      g.fillText('PCIE_X16', 60, 540)
-      g.fillText('M2_1..6', 60, 690)
-    }).tex
+export function TraceGlow({ base, lift }: { base: number; lift: number }) {
+  const mat = useMemo(() => {
     const glow = canvasTex(1024, 1024, (g) => {
       g.fillStyle = '#000'
       g.fillRect(0, 0, 1024, 1024)
@@ -168,32 +177,42 @@ function useBoardTextures() {
       }
     }).tex
     glow.colorSpace = THREE.NoColorSpace
-    return { base, glow }
-  }, [])
-}
-
-// Additive layer: dim traces at rest; at power-up a bright wave spreads from the power connectors
-function useTraceMaterial(map: THREE.Texture) {
-  return useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uMap: { value: map }, uWave: { value: 0 }, uTime: { value: 0 }, uColor: { value: new THREE.Color() }, uBase: { value: new THREE.Color('#2f8a6a') } },
-    vertexShader: VERT_UV,
-    fragmentShader: `
-      uniform sampler2D uMap; uniform float uWave; uniform float uTime; uniform vec3 uColor; uniform vec3 uBase;
-      varying vec2 vUv;
-      void main() {
-        float tr = texture2D(uMap, vUv).r;
-        // board UVs of the 24-pin and CPU 8-pin connectors
-        float d = min(distance(vUv, vec2(0.96, 0.54)), distance(vUv, vec2(0.08, 0.96)));
-        float on = step(0.001, uWave);
-        float front = uWave * 1.4;
-        float lit = smoothstep(front, front - 0.15, d) * on;
-        float band = exp(-pow((d - front) * 12.0, 2.0)) * on * (1.0 - smoothstep(0.85, 1.0, uWave));
-        float shimmer = 0.85 + 0.15 * sin(uTime * 2.0 - d * 25.0);
-        vec3 col = uBase * tr * 0.32 + uColor * tr * (lit * 0.55 * shimmer + band * 2.2);
-        gl_FragColor = vec4(col, 1.0);
-      }`,
-    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-  }), [map])
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uMap: { value: glow }, uWave: { value: 0 }, uTime: { value: 0 }, uColor: { value: new THREE.Color() },
+        uBase: { value: new THREE.Color('#2f8a6a').multiplyScalar(base) },
+        uC1: { value: boardUv(ATX24.x, ATX24.z) }, uC2: { value: boardUv(EPS8.x, EPS8.z) },
+      },
+      vertexShader: VERT_UV,
+      fragmentShader: `
+        uniform sampler2D uMap; uniform float uWave; uniform float uTime; uniform vec3 uColor; uniform vec3 uBase;
+        uniform vec2 uC1; uniform vec2 uC2; varying vec2 vUv;
+        void main() {
+          float tr = texture2D(uMap, vUv).r;
+          float d = min(distance(vUv, uC1), distance(vUv, uC2));
+          float on = step(0.001, uWave);
+          float front = uWave * 1.4;
+          float lit = smoothstep(front, front - 0.15, d) * on;
+          float band = exp(-pow((d - front) * 12.0, 2.0)) * on * (1.0 - smoothstep(0.85, 1.0, uWave));
+          float shimmer = 0.85 + 0.15 * sin(uTime * 2.0 - d * 25.0);
+          vec3 col = uBase * tr + uColor * tr * (lit * 0.55 * shimmer + band * 2.2);
+          gl_FragColor = vec4(col, 1.0);
+        }`,
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
+    })
+  }, [base])
+  useFrame(({ clock }) => {
+    mat.uniforms.uWave.value = S.wave
+    mat.uniforms.uTime.value = clock.elapsedTime
+    mat.uniforms.uColor.value.copy(GLOW)
+  })
+  return (
+    <FxLayer>
+      <mesh position={[BOARD.x, B + lift, BOARD.z]} rotation-x={-Math.PI / 2} material={mat}>
+        <planeGeometry args={[BOARD.w, BOARD.d]} />
+      </mesh>
+    </FxLayer>
+  )
 }
 
 function DebugDisplay({ name }: { name: string }) {
@@ -226,12 +245,12 @@ function DebugDisplay({ name }: { name: string }) {
     for (let y = 0; y < 200; y += 3) g.fillRect(0, y, 512, 1)
     tex.needsUpdate = true
   })
+  // a small POST display card standing at the top-right corner of the board
   return (
-    <group position={[0.5, B, -0.42]} rotation-x={-0.55}>
-      <mesh position={[0, 0.09, 0]}>
-        <boxGeometry args={[0.34, 0.16, 0.025]} />
-        <meshStandardMaterial color="#14171d" roughness={0.4} />
-      </mesh>
+    <group position={[0.24, B, -0.74]} rotation-x={-0.5}>
+      <RoundedBox args={[0.34, 0.16, 0.025]} radius={0.006} position={[0, 0.09, 0]}>
+        <meshStandardMaterial color="#14171d" roughness={0.35} metalness={0.4} />
+      </RoundedBox>
       <mesh position={[0, 0.09, 0.0131]}>
         <planeGeometry args={[0.31, 0.12]} />
         <meshBasicMaterial map={screen.tex} toneMapped={false} />
@@ -240,109 +259,113 @@ function DebugDisplay({ name }: { name: string }) {
   )
 }
 
-export function Motherboard({ name }: { name: string }) {
-  const { base, glow } = useBoardTextures()
-  const traceMat = useTraceMaterial(glow)
-  const plate = useRef<THREE.Group>(null)
+// Always-present board details (model or primitive): POST display, LEDs, CPU lever, M.2 standoffs
+export function BoardExtras({ name }: { name: string }) {
   const lever = useRef<THREE.Group>(null)
   useFrame(({ clock }) => {
-    if (plate.current) plate.current.rotation.x = -1.9 * (1 - S.plate)
     if (lever.current) lever.current.rotation.x = 1.1 * (1 - S.lever)
-    traceMat.uniforms.uWave.value = S.wave
-    traceMat.uniforms.uTime.value = clock.elapsedTime
-    traceMat.uniforms.uColor.value.copy(GLOW)
     // status LEDs pulse all the time; they take the section colour once powered
     const pulse = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 3))
-    LED_MAT.color.set(ACCENT).lerp(GLOW, S.wave).multiplyScalar(pulse)
+    LED_MAT.color.set(ACCENT).lerp(GLOW, S.wave).multiplyScalar(pulse * 2)
   })
-  const metal = <meshStandardMaterial color="#2b2f38" metalness={0.7} roughness={0.35} />
   return (
     <group>
-      <mesh position={[0, B - 0.015, 0]} receiveShadow>
-        <boxGeometry args={[1.3, 0.03, 1.3]} />
-        <meshStandardMaterial map={base} roughness={0.5} />
-      </mesh>
-      <mesh position={[0, B + 0.001, 0]} rotation-x={-Math.PI / 2} material={traceMat}>
-        <planeGeometry args={[1.3, 1.3]} />
-      </mesh>
-      {/* status LEDs */}
-      {[[0.52, -0.2], [0.52, -0.16], [0.52, -0.12], [-0.6, 0.55], [0.3, 0.6]].map(([x, z], i) => (
-        <mesh key={i} position={[x, B + 0.006, z]} material={LED_MAT}><boxGeometry args={[0.018, 0.012, 0.018]} /></mesh>
+      <DebugDisplay name={name} />
+      {[[ATX24.x - 0.06, ATX24.z + 0.16], [ATX24.x - 0.06, ATX24.z + 0.2], [ATX24.x - 0.06, ATX24.z + 0.24], [-0.7, 0.6], [0.3, 0.6]].map(([x, z], i) => (
+        <mesh key={i} position={[x, B + 0.008, z]} material={LED_MAT}><boxGeometry args={[0.014, 0.01, 0.014]} /></mesh>
       ))}
-      {/* VRM heatsinks + rear I/O shroud + chipset */}
-      <mesh position={[SOCKET.x, B + 0.04, SOCKET.z - 0.26]} castShadow><boxGeometry args={[0.5, 0.08, 0.1]} />{metal}</mesh>
-      <mesh position={[SOCKET.x - 0.27, B + 0.04, SOCKET.z]} castShadow><boxGeometry args={[0.1, 0.08, 0.42]} />{metal}</mesh>
-      <mesh position={[-0.6, B + 0.08, -0.3]} castShadow><boxGeometry args={[0.08, 0.16, 0.6]} />{metal}</mesh>
-      <mesh position={[0.45, B + 0.02, 0.22]}><boxGeometry args={[0.22, 0.04, 0.16]} />{metal}</mesh>
-      {/* CPU socket with load plate (hinged at back) and lever (hinged at front) */}
-      <mesh position={[SOCKET.x, B + 0.01, SOCKET.z]}>
-        <boxGeometry args={[0.3, 0.02, 0.3]} />
-        <meshStandardMaterial color="#c2a46c" metalness={0.6} roughness={0.4} />
-      </mesh>
-      <group ref={plate} position={[SOCKET.x, B + 0.025, SOCKET.z - 0.15]}>
-        {[[0, 0.01, 0.3, 0.02], [0, 0.29, 0.3, 0.02], [-0.14, 0.15, 0.02, 0.3], [0.14, 0.15, 0.02, 0.3]].map(([x, z, w, d], i) => (
-          <mesh key={i} position={[x, 0, z]}><boxGeometry args={[w, 0.012, d]} />{metal}</mesh>
-        ))}
-      </group>
-      <group ref={lever} position={[SOCKET.x + 0.17, B + 0.02, SOCKET.z + 0.15]}>
-        <mesh position={[0, 0, -0.16]} rotation-x={Math.PI / 2}>
-          <cylinderGeometry args={[0.008, 0.008, 0.32, 6]} />
+      <group ref={lever} position={[SOCKET.x + SOCKET.w / 2 + 0.01, SOCKET.seat, SOCKET.z + SOCKET.d / 2]}>
+        <mesh position={[0, 0, -0.11]} rotation-x={Math.PI / 2}>
+          <cylinderGeometry args={[0.006, 0.006, 0.22, 8]} />
           <meshStandardMaterial color="#c9ccd2" metalness={0.9} roughness={0.25} />
         </mesh>
       </group>
-      {RAM_X.map((x) => (
-        <mesh key={x} position={[x, B + 0.015, RAM_Z]}><boxGeometry args={[0.03, 0.03, 0.66]} /><meshStandardMaterial color="#1a1c22" /></mesh>
-      ))}
-      <mesh position={[-0.28, B + 0.015, PCIE_Z]}><boxGeometry args={[0.7, 0.03, 0.035]} /><meshStandardMaterial color="#9aa0aa" metalness={0.8} roughness={0.3} /></mesh>
-      {Array.from({ length: N_SSD }, (_, i) => {
-        const s = ssdSlot(i)
-        return (
-          <group key={i}>
-            <mesh position={[s.x - 0.2, B + 0.01, s.z]}><boxGeometry args={[0.03, 0.02, 0.1]} /><meshStandardMaterial color="#1a1c22" /></mesh>
-            <mesh position={[s.x + 0.17, B + 0.01, s.z]}><cylinderGeometry args={[0.01, 0.01, 0.02, 8]} /><meshStandardMaterial color="#c2a46c" metalness={0.8} /></mesh>
-          </group>
-        )
-      })}
-      {/* 24-pin and CPU 8-pin headers */}
-      <mesh position={[0.6, B + 0.03, -0.05]}><boxGeometry args={[0.05, 0.06, 0.26]} /><meshStandardMaterial color="#e8e8e2" roughness={0.6} /></mesh>
-      <mesh position={[-0.55, B + 0.03, -0.6]}><boxGeometry args={[0.12, 0.06, 0.05]} /><meshStandardMaterial color="#e8e8e2" roughness={0.6} /></mesh>
-      <DebugDisplay name={name} />
     </group>
   )
 }
 
-// ---------- CPU + cooler ----------
+// Primitive motherboard (fallback when motherboard.glb is missing), laid out on the measured slots
+export function BoardPrimitive() {
+  const base = useMemo(() => canvasTex(512, 640, (g) => {
+    g.fillStyle = '#0c1a1f'
+    g.fillRect(0, 0, 512, 640)
+    g.fillStyle = 'rgba(230,230,220,0.5)'
+    g.font = '600 16px "JetBrains Mono", monospace'
+    g.fillText('PART-OF-ME  REV 1.0', 24, 620)
+  }).tex, [])
+  const plate = useRef<THREE.Group>(null)
+  useFrame(() => { if (plate.current) plate.current.rotation.x = -1.9 * (1 - S.plate) })
+  const metal = <meshStandardMaterial color="#2b2f38" metalness={0.7} roughness={0.35} />
+  const slot = <meshStandardMaterial color="#1a1c22" roughness={0.6} />
+  return (
+    <group>
+      <RoundedBox args={[BOARD.w, 0.03, BOARD.d]} radius={0.006} position={[BOARD.x, B - 0.015, BOARD.z]} receiveShadow>
+        <meshStandardMaterial map={base} roughness={0.5} />
+      </RoundedBox>
+      <RoundedBox args={[0.5, 0.08, 0.1]} radius={0.01} position={[SOCKET.x, B + 0.04, SOCKET.z - 0.2]} castShadow>{metal}</RoundedBox>
+      <RoundedBox args={[0.1, 0.08, 0.42]} radius={0.01} position={[SOCKET.x - 0.24, B + 0.04, SOCKET.z]} castShadow>{metal}</RoundedBox>
+      <RoundedBox args={[0.1, 0.16, 0.6]} radius={0.01} position={[BOARD.x - BOARD.w / 2 + 0.06, B + 0.08, -0.35]} castShadow>{metal}</RoundedBox>
+      <mesh position={[SOCKET.x, B + 0.017, SOCKET.z]}>
+        <boxGeometry args={[SOCKET.w * 0.8, 0.034, SOCKET.d * 0.9]} />
+        <meshStandardMaterial color="#c2a46c" metalness={0.6} roughness={0.4} />
+      </mesh>
+      <group ref={plate} position={[SOCKET.x, SOCKET.seat - 0.005, SOCKET.z - 0.1]}>
+        {[[0, 0.01, 0.2, 0.02], [0, 0.19, 0.2, 0.02], [-0.09, 0.1, 0.02, 0.2], [0.09, 0.1, 0.02, 0.2]].map(([x, z, w, d], i) => (
+          <mesh key={i} position={[x, 0, z]}><boxGeometry args={[w, 0.01, d]} />{metal}</mesh>
+        ))}
+      </group>
+      {RAM_X.map((x) => <mesh key={x} position={[x, B + 0.032, RAM_Z]}><boxGeometry args={[0.03, 0.064, 0.675]} />{slot}</mesh>)}
+      {[PCIE.z, 0.372, 0.557].map((z) => <mesh key={z} position={[PCIE.x, B + 0.031, z]}><boxGeometry args={[PCIE.len, 0.062, 0.04]} />{slot}</mesh>)}
+      <mesh position={[ATX24.x, B + 0.04, ATX24.z]}><boxGeometry args={[0.05, 0.08, 0.24]} /><meshStandardMaterial color="#e8e8e2" roughness={0.6} /></mesh>
+      <mesh position={[EPS8.x, B + 0.035, EPS8.z]}><boxGeometry args={[0.1, 0.07, 0.05]} /><meshStandardMaterial color="#e8e8e2" roughness={0.6} /></mesh>
+      <TraceGlow base={0.32} lift={0.001} />
+    </group>
+  )
+}
+
+// ---------- CPU + cooler (refined primitives) ----------
 export function Cpu() {
   const ihs = useMemo(() => canvasTex(256, 256, (g) => {
-    g.fillStyle = '#b9bcc2'
+    const grad = g.createLinearGradient(0, 0, 256, 256)
+    grad.addColorStop(0, '#c9ccd2')
+    grad.addColorStop(1, '#9fa4ac')
+    g.fillStyle = grad
     g.fillRect(0, 0, 256, 256)
     g.fillStyle = 'rgba(40,44,52,0.85)'
-    g.font = '700 22px "JetBrains Mono", monospace'
+    g.font = '700 24px "JetBrains Mono", monospace'
     g.fillText('O. S. NIKAM', 30, 110)
-    g.font = '400 16px "JetBrains Mono", monospace'
-    g.fillText('COMP. ENGG · 2026', 30, 140)
+    g.font = '400 17px "JetBrains Mono", monospace'
+    g.fillText('COMP. ENGG · 2026', 30, 142)
   }).tex, [])
   return (
-    <Part k="cpu" from={[SOCKET.x, 1.35, -0.15]} to={[SOCKET.x, B + 0.02, SOCKET.z]} fromRot={[0.5, 0.3, 0]} seed={1}>
-      <mesh position={[0, 0.005, 0]}><boxGeometry args={[0.26, 0.012, 0.26]} /><meshStandardMaterial color="#1f5a3a" roughness={0.6} /></mesh>
-      <mesh position={[0, 0.02, 0]} castShadow><boxGeometry args={[0.2, 0.02, 0.2]} /><meshStandardMaterial color="#c4c7cd" metalness={0.85} roughness={0.3} /></mesh>
-      <mesh position={[0, 0.0305, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.19, 0.19]} /><meshStandardMaterial map={ihs} metalness={0.7} roughness={0.35} /></mesh>
+    <Part k="cpu" from={[SOCKET.x, 1.35, -0.15]} to={[SOCKET.x, SOCKET.seat, SOCKET.z]} fromRot={[0.5, 0.3, 0]} seed={1}>
+      <RoundedBox args={[0.19, 0.012, 0.19]} radius={0.003} position={[0, 0.006, 0]}><meshStandardMaterial color="#1f5a3a" roughness={0.55} /></RoundedBox>
+      <RoundedBox args={[0.15, 0.016, 0.15]} radius={0.006} position={[0, 0.02, 0]} castShadow>
+        <meshStandardMaterial color="#c4c7cd" metalness={0.9} roughness={0.28} />
+      </RoundedBox>
+      <mesh position={[0, 0.0285, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.135, 0.135]} /><meshStandardMaterial map={ihs} metalness={0.75} roughness={0.32} /></mesh>
     </Part>
   )
 }
 
 export function Cooler() {
+  const copper = <meshStandardMaterial color="#b87333" metalness={0.9} roughness={0.28} />
   return (
-    <Part k="cooler" from={[-0.95, 1.55, -0.95]} to={[SOCKET.x, B + 0.05, SOCKET.z]} fromRot={[0.35, 0.6, 0.1]} seed={2}>
-      <mesh position={[0, 0.01, 0]}><boxGeometry args={[0.22, 0.02, 0.22]} /><meshStandardMaterial color="#b87333" metalness={0.8} roughness={0.3} /></mesh>
-      {Array.from({ length: 9 }, (_, i) => (
-        <mesh key={i} position={[0, 0.04 + i * 0.016, 0]} castShadow={i === 8}>
-          <boxGeometry args={[0.32, 0.005, 0.32]} />
-          <meshStandardMaterial color="#c8ccd3" metalness={0.8} roughness={0.35} />
+    <Part k="cooler" from={[-0.95, 1.55, -0.95]} to={[SOCKET.x, SOCKET.seat + 0.03, SOCKET.z]} fromRot={[0.35, 0.6, 0.1]} seed={2}>
+      <RoundedBox args={[0.16, 0.022, 0.16]} radius={0.005} position={[0, 0.011, 0]}>{copper}</RoundedBox>
+      {/* heat pipes rising through the fin stack */}
+      {[-0.05, 0, 0.05].map((x) => (
+        <mesh key={x} position={[x, 0.1, 0]}><cylinderGeometry args={[0.009, 0.009, 0.18, 10]} />{copper}</mesh>
+      ))}
+      {Array.from({ length: 10 }, (_, i) => (
+        <mesh key={i} position={[0, 0.045 + i * 0.014, 0]} castShadow={i === 9}>
+          <boxGeometry args={[0.26, 0.004, 0.26]} />
+          <meshStandardMaterial color="#c8ccd3" metalness={0.85} roughness={0.32} />
         </mesh>
       ))}
-      <group position={[0, 0.2, 0]}>
-        <Fan r={0.14} speed={() => 0.15 + S.fan} rgb={0} />
+      <RoundedBox args={[0.27, 0.012, 0.27]} radius={0.004} position={[0, 0.19, 0]}><meshStandardMaterial color="#15181e" metalness={0.5} roughness={0.4} /></RoundedBox>
+      <group position={[0, 0.205, 0]}>
+        <Fan r={0.115} speed={() => 0.15 + S.fan} rgb={0} />
       </group>
     </Part>
   )
@@ -365,32 +388,40 @@ function hoverEvents(key: string, sKey: string, onHover: StickProps['onHover'], 
   }
 }
 
-// ---------- RAM sticks (labels on the top spine, read from the right side) ----------
-export function RamStick({ i, active, onHover, onPick }: StickProps) {
+// ---------- RAM: wrapper with label + light bar; the body is the RAM model or RamBodyPrimitive ----------
+// Body origin = bottom centre, long axis along z, height RAM_H.
+export function RamBodyPrimitive() {
+  return (
+    <group>
+      <mesh position={[0, 0.05, 0]} castShadow><boxGeometry args={[0.012, 0.1, 0.6]} /><meshStandardMaterial color="#1d4a33" /></mesh>
+      <RoundedBox args={[0.026, RAM_H - 0.03, 0.6]} radius={0.004} position={[0, 0.03 + (RAM_H - 0.03) / 2, 0]}>
+        <meshStandardMaterial color="#1b1e25" metalness={0.7} roughness={0.32} />
+      </RoundedBox>
+    </group>
+  )
+}
+
+export function RamStick({ i, active, onHover, onPick, body }: StickProps & { body: ReactNode }) {
   const lang = languages[i]
-  const label = useMemo(() => canvasTex(512, 48, (g) => {
+  const label = useMemo(() => canvasTex(512, 40, (g) => {
     g.fillStyle = '#0f1218'
-    g.fillRect(0, 0, 512, 48)
+    g.fillRect(0, 0, 512, 40)
     g.fillStyle = ACCENT
-    g.font = '700 32px "JetBrains Mono", monospace'
-    g.fillText(lang.name.toUpperCase(), 14, 35)
-    g.fillStyle = 'rgba(255,255,255,0.35)'
-    g.font = '400 18px "JetBrains Mono", monospace'
-    g.fillText('DDR5 · 1x', 400, 32)
+    g.font = '700 30px "JetBrains Mono", monospace'
+    g.fillText(lang.name.toUpperCase(), 12, 30)
   }).tex, [lang.name])
   const key = `ram-${i}`
   return (
     <Part
-      k={`ram${i}`} from={[0.15 + i * 0.17, 1.12 + i * 0.06, -0.6 + i * 0.03]} to={[RAM_X[i], B + 0.03, RAM_Z]}
+      k={`ram${i}`} from={[0.15 + i * 0.17, 1.12 + i * 0.06, -0.6 + i * 0.03]} to={[RAM_X[i], RAM_SEAT, RAM_Z]}
       fromRot={[0.2, 0.3, 0.35]} seed={3 + i} {...hoverEvents(key, `ram${i}`, onHover, onPick)}
     >
       <group position-y={active ? 0.025 : 0}>
-        <mesh position={[0, 0.07, 0]} castShadow><boxGeometry args={[0.02, 0.14, 0.6]} /><meshStandardMaterial color="#1d4a33" /></mesh>
-        <mesh position={[0, 0.085, 0]}><boxGeometry args={[0.045, 0.12, 0.58]} /><meshStandardMaterial color="#20242c" metalness={0.6} roughness={0.35} /></mesh>
-        <mesh position={[0, 0.15, 0]}><boxGeometry args={[0.042, 0.012, 0.56]} /><primitive object={RGB_MATS[1 + (i % 2)]} attach="material" /></mesh>
-        <group position={[0, 0.1572, 0]} rotation-y={Math.PI / 2}>
+        {body}
+        <mesh position={[0, RAM_H + 0.003, 0.02]}><boxGeometry args={[0.03, 0.006, 0.5]} /><primitive object={RGB_MATS[1 + (i % 2)]} attach="material" /></mesh>
+        <group position={[0, RAM_H + 0.0065, -0.02]} rotation-y={Math.PI / 2}>
           <mesh rotation-x={-Math.PI / 2}>
-            <planeGeometry args={[0.5, 0.04]} />
+            <planeGeometry args={[0.42, 0.032]} />
             <meshBasicMaterial map={label} toneMapped={false} color={active ? '#ffffff' : '#cfd6d2'} />
           </mesh>
         </group>
@@ -399,8 +430,9 @@ export function RamStick({ i, active, onHover, onPick }: StickProps) {
   )
 }
 
-// ---------- GPU ----------
-export function Gpu() {
+// ---------- GPU: wrapper; the body is the GPU model or GpuBodyPrimitive ----------
+// Body origin = bottom centre of the card's PCB edge, long axis x (bracket at -x), fans facing +z.
+export function GpuBodyPrimitive() {
   const top = useMemo(() => canvasTex(512, 64, (g) => {
     g.fillStyle = '#0f1218'
     g.fillRect(0, 0, 512, 64)
@@ -411,32 +443,34 @@ export function Gpu() {
     g.font = '400 20px "JetBrains Mono", monospace'
     g.fillText(aiml.slice(0, 3).join(' · '), 150, 42)
   }).tex, [])
-  const W = 1.0, H = 0.42, T = 0.15
-  const gpuFanSpeed = () => Math.max(S.gpuFan, S.fan)
+  const { len: W, h: H, t: T } = GPU_SIZE
+  const speed = () => Math.max(S.gpuFan, S.fan)
   return (
-    <Part k="gpu" from={[-0.4, 1.0, 0.6]} to={[-0.15, B + 0.01, PCIE_Z + 0.02]} fromRot={[0.15, 0.25, 0.05]} seed={7}>
-      <mesh position={[0, H / 2 + 0.01, 0]} castShadow>
-        <boxGeometry args={[W, H, T]} />
-        <meshStandardMaterial color="#23272f" metalness={0.5} roughness={0.4} />
-      </mesh>
-      <mesh position={[0, 0.02, -0.01]}><boxGeometry args={[0.5, 0.04, 0.02]} /><meshStandardMaterial color="#c9a45c" metalness={0.9} roughness={0.3} /></mesh>
-      <mesh position={[-W / 2 - 0.01, H / 2, 0]}><boxGeometry args={[0.02, H + 0.08, T + 0.02]} /><meshStandardMaterial color="#9aa0aa" metalness={0.9} roughness={0.3} /></mesh>
-      <mesh position={[0, H + 0.0115, 0]} rotation-x={-Math.PI / 2}>
-        <planeGeometry args={[0.6, 0.075]} />
-        <meshBasicMaterial map={top} toneMapped={false} />
-      </mesh>
-      <mesh position={[0.36, H + 0.012, 0]}><boxGeometry args={[0.2, 0.004, 0.06]} /><primitive object={RGB_MATS[3]} attach="material" /></mesh>
-      <mesh position={[0.35, H + 0.03, -0.045]}><boxGeometry args={[0.08, 0.04, 0.035]} /><meshStandardMaterial color="#111" /></mesh>
-      {[-0.24, 0.24].map((x) => (
-        <group key={x} position={[x, H / 2 + 0.01, T / 2 + 0.005]} rotation-x={Math.PI / 2}>
-          <Fan r={0.17} speed={gpuFanSpeed} rgb={4} />
+    <group>
+      <RoundedBox args={[W, H, T]} radius={0.02} position={[0, H / 2, T * 0.25]} castShadow>
+        <meshStandardMaterial color="#23272f" metalness={0.55} roughness={0.38} />
+      </RoundedBox>
+      <mesh position={[-W / 2 - 0.01, H / 2 - 0.05, 0]}><boxGeometry args={[0.02, H + 0.1, T + 0.04]} /><meshStandardMaterial color="#9aa0aa" metalness={0.9} roughness={0.3} /></mesh>
+      <mesh position={[0, H + 0.0015, T * 0.25]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.6, 0.075]} /><meshBasicMaterial map={top} toneMapped={false} /></mesh>
+      <mesh position={[0.4, H + 0.003, T * 0.25]}><boxGeometry args={[0.2, 0.004, 0.06]} /><primitive object={RGB_MATS[3]} attach="material" /></mesh>
+      {[-0.36, 0, 0.36].map((x) => (
+        <group key={x} position={[x, H / 2, T * 0.75 + 0.005]} rotation-x={Math.PI / 2}>
+          <Fan r={0.16} speed={speed} rgb={4} />
         </group>
       ))}
+    </group>
+  )
+}
+
+export function Gpu({ body }: { body: ReactNode }) {
+  return (
+    <Part k="gpu" from={[-0.3, 1.0, 0.65]} to={[0, PCIE.top - 0.03, PCIE.z]} fromRot={[0.15, 0.25, 0.05]} seed={7}>
+      {body}
     </Part>
   )
 }
 
-// ---------- SSDs (one per project) ----------
+// ---------- SSDs (one per project; refined primitives) ----------
 export function Ssd({ i, active, onHover, onPick }: StickProps) {
   const p = projects[i]
   const label = useMemo(() => canvasTex(512, 128, (g) => {
@@ -458,14 +492,19 @@ export function Ssd({ i, active, onHover, onPick }: StickProps) {
   return (
     <Part
       k={`ssd${i}`} from={[1.05 + (i % 2) * 0.5, 1.2 + Math.floor(i / 2) * 0.22, 0.05 + (i % 2) * 0.12]}
-      to={[s.x, B + 0.025, s.z]} fromRot={[0.55, -0.3, 0.1]} seed={9 + i}
+      to={[s.x, SSD_Y, s.z]} fromRot={[0.55, -0.3, 0.1]} seed={9 + i}
       {...hoverEvents(key, `ssd${i}`, onHover, onPick)}
     >
       <group position-y={active ? 0.03 : 0}>
-        <mesh><boxGeometry args={[0.38, 0.012, 0.11]} /><meshStandardMaterial color="#173b2b" roughness={0.6} /></mesh>
-        <mesh position={[0, 0.0065, 0]} rotation-x={-Math.PI / 2}>
+        <RoundedBox args={[0.38, 0.01, 0.11]} radius={0.003}><meshStandardMaterial color="#123526" roughness={0.5} /></RoundedBox>
+        {/* gold edge connector, controller + NAND chips under the label */}
+        <mesh position={[-0.186, 0.001, 0]}><boxGeometry args={[0.012, 0.011, 0.09]} /><meshStandardMaterial color="#d4af37" metalness={1} roughness={0.25} /></mesh>
+        {[-0.1, 0.02, 0.12].map((x) => (
+          <mesh key={x} position={[x, 0.007, 0]}><boxGeometry args={[0.08, 0.004, 0.08]} /><meshStandardMaterial color="#111317" roughness={0.4} /></mesh>
+        ))}
+        <mesh position={[0, 0.0098, 0]} rotation-x={-Math.PI / 2}>
           <planeGeometry args={[0.34, 0.085]} />
-          <meshStandardMaterial map={label} roughness={0.7} emissive={active ? ACCENT : '#000000'} emissiveIntensity={active ? 0.25 : 0} />
+          <meshStandardMaterial map={label} roughness={0.65} emissive={active ? ACCENT : '#000000'} emissiveIntensity={active ? 0.25 : 0} />
         </mesh>
       </group>
     </Part>
@@ -487,6 +526,15 @@ export function Psu() {
       }`,
     transparent: true, toneMapped: false,
   }), [])
+  const sticker = useMemo(() => canvasTex(256, 128, (g) => {
+    g.fillStyle = '#c9ccd2'
+    g.fillRect(0, 0, 256, 128)
+    g.fillStyle = '#1b2233'
+    g.font = '700 26px "JetBrains Mono", monospace'
+    g.fillText('PSU · SAP', 20, 50)
+    g.font = '400 14px "JetBrains Mono", monospace'
+    g.fillText(sap.title.toUpperCase(), 20, 84)
+  }).tex, [])
   useFrame(() => {
     gauge.uniforms.uFill.value = S.gauge
     gauge.uniforms.uColor.value.copy(GLOW)
@@ -494,8 +542,13 @@ export function Psu() {
   return (
     <Part k="psu" from={[1.7, 0.85, 0.8]} to={[PSU.x, PSU.y, PSU.z]} fromRot={[0.2, -0.45, 0.12]} seed={14}>
       <RoundedBox args={[0.4, 0.34, 0.6]} radius={0.02} castShadow>
-        <meshStandardMaterial color="#1c1f26" metalness={0.5} roughness={0.45} />
+        <meshStandardMaterial color="#1a1d23" metalness={0.65} roughness={0.35} />
       </RoundedBox>
+      <mesh position={[0.2011, 0, 0.05]} rotation-y={Math.PI / 2}><planeGeometry args={[0.32, 0.16]} /><meshStandardMaterial map={sticker} roughness={0.5} metalness={0.3} /></mesh>
+      {/* modular ports on the cable side */}
+      {[-0.18, -0.1, -0.02].map((z) => (
+        <mesh key={z} position={[-0.201, 0.08, z]}><boxGeometry args={[0.004, 0.05, 0.06]} /><meshStandardMaterial color="#0b0c0f" /></mesh>
+      ))}
       <group position={[0, 0.172, 0.05]}>
         <Fan r={0.14} speed={() => 0.04 + S.psuFan + S.fan} />
       </group>
@@ -522,8 +575,22 @@ function useEnergyMaterial() {
   }), [])
 }
 
+// sleeved-cable look: fine diagonal braid in the colour map
+const SLEEVE = (() => {
+  const { tex } = canvasTex(64, 16, (g) => {
+    g.fillStyle = '#16181d'
+    g.fillRect(0, 0, 64, 16)
+    g.strokeStyle = '#2a2e36'
+    g.lineWidth = 2
+    for (let x = -16; x < 64; x += 6) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 16, 16); g.stroke() }
+  })
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  tex.repeat.set(60, 1)
+  return tex
+})()
+
 export function Cable({ i }: { i: number }) {
-  const r = i === 0 ? 0.03 : 0.02
+  const r = i === 0 ? 0.028 : 0.018
   const geo = useMemo(() => new THREE.TubeGeometry(CABLES[i], 64, r, 8), [i, r])
   const glowGeo = useMemo(() => new THREE.TubeGeometry(CABLES[i], 64, r * 1.3, 8), [i, r])
   const energy = useEnergyMaterial()
@@ -547,12 +614,11 @@ export function Cable({ i }: { i: number }) {
   })
   return (
     <>
-      <mesh geometry={geo}><meshStandardMaterial color="#121418" roughness={0.55} /></mesh>
-      <mesh geometry={glowGeo} material={energy} />
-      <mesh ref={plug}>
-        <boxGeometry args={[i === 0 ? 0.06 : 0.05, 0.05, i === 0 ? 0.2 : 0.06]} />
-        <meshStandardMaterial color="#0d0f12" roughness={0.5} />
-      </mesh>
+      <mesh geometry={geo} castShadow><meshStandardMaterial map={SLEEVE} roughness={0.6} /></mesh>
+      <FxLayer><mesh geometry={glowGeo} material={energy} /></FxLayer>
+      <RoundedBox ref={plug} args={[i === 0 ? 0.05 : 0.045, 0.045, i === 0 ? 0.2 : 0.06]} radius={0.006}>
+        <meshStandardMaterial color="#0d0f12" roughness={0.45} />
+      </RoundedBox>
     </>
   )
 }
@@ -608,19 +674,23 @@ function Impact({ k, pos, size }: { k: string; pos: number[]; size: number }) {
 }
 
 export function Impacts() {
-  return <>{IMPACTS.map((p) => <Impact key={p.k} {...p} />)}</>
+  return <FxLayer>{IMPACTS.map((p) => <Impact key={p.k} {...p} />)}</FxLayer>
 }
 
 // ---------- case (lying on its side), glass panel, monitor, RGB ----------
 export function Case() {
-  const wall = <meshStandardMaterial color="#14171d" metalness={0.6} roughness={0.45} />
+  const wall = <meshStandardMaterial color="#14171d" metalness={0.65} roughness={0.38} />
   return (
     <group>
-      <mesh position={[0.225, 0.025, 0.025]} receiveShadow><boxGeometry args={[2.15, 0.05, 1.75]} />{wall}</mesh>
-      <mesh position={[0.225, 0.36, -0.84]} receiveShadow><boxGeometry args={[2.15, 0.7, 0.03]} />{wall}</mesh>
-      <mesh position={[-0.84, 0.36, 0.025]} receiveShadow><boxGeometry args={[0.03, 0.7, 1.75]} />{wall}</mesh>
-      <mesh position={[1.285, 0.36, 0.025]} receiveShadow><boxGeometry args={[0.03, 0.7, 1.75]} />{wall}</mesh>
-      <mesh position={[0.225, 0.08, 0.885]}><boxGeometry args={[2.15, 0.1, 0.03]} />{wall}</mesh>
+      <RoundedBox args={[2.15, 0.05, 1.75]} radius={0.012} position={[0.225, 0.025, 0.025]} receiveShadow>{wall}</RoundedBox>
+      <RoundedBox args={[2.15, 0.7, 0.03]} radius={0.01} position={[0.225, 0.36, -0.84]} receiveShadow>{wall}</RoundedBox>
+      <RoundedBox args={[0.03, 0.7, 1.75]} radius={0.01} position={[-0.84, 0.36, 0.025]} receiveShadow>{wall}</RoundedBox>
+      <RoundedBox args={[0.03, 0.7, 1.75]} radius={0.01} position={[1.285, 0.36, 0.025]} receiveShadow>{wall}</RoundedBox>
+      <RoundedBox args={[2.15, 0.1, 0.03]} radius={0.008} position={[0.225, 0.08, 0.885]}>{wall}</RoundedBox>
+      {/* motherboard standoffs */}
+      {[[-0.73, -0.72], [0.33, -0.72], [-0.73, 0.6], [0.33, 0.6], [-0.2, -0.05]].map(([x, z]) => (
+        <mesh key={`${x}${z}`} position={[x, 0.07, z]}><cylinderGeometry args={[0.012, 0.012, 0.04, 8]} /><meshStandardMaterial color="#b89a5a" metalness={0.9} roughness={0.3} /></mesh>
+      ))}
       <mesh position={[0.225, 0.68, -0.82]}><boxGeometry args={[2.0, 0.015, 0.01]} /><primitive object={RGB_MATS[5]} attach="material" /></mesh>
       <mesh position={[-0.82, 0.68, 0.025]}><boxGeometry args={[0.01, 0.015, 1.6]} /><primitive object={RGB_MATS[5]} attach="material" /></mesh>
       {[-0.55, -0.12].map((z) => (
@@ -637,9 +707,8 @@ export function Glass() {
     <Part k="glass" from={[2.3, 1.05, -0.3]} to={[0.225, 0.715, 0.025]} fromRot={[0, -0.3, 1.15]}>
       <mesh>
         <boxGeometry args={[2.15, 0.01, 1.75]} />
-        <meshStandardMaterial color="#a9c3d6" transparent opacity={0.16} metalness={0.9} roughness={0.05} depthWrite={false} />
+        <meshStandardMaterial color="#a9c3d6" transparent opacity={0.14} metalness={0.95} roughness={0.04} depthWrite={false} />
       </mesh>
-      {/* thin edge so the panel reads as glass */}
       <lineSegments>
         <edgesGeometry args={[new THREE.BoxGeometry(2.15, 0.01, 1.75)]} />
         <lineBasicMaterial color="#cfe3ff" transparent opacity={0.18} />
@@ -681,9 +750,9 @@ export function Monitor() {
   })
   return (
     <group position={[0.2, 0, -2.0]}>
-      <mesh position={[0, 0.02, 0]}><boxGeometry args={[0.7, 0.04, 0.35]} /><meshStandardMaterial color="#1a1d24" metalness={0.5} roughness={0.4} /></mesh>
-      <mesh position={[0, 0.35, -0.05]}><boxGeometry args={[0.1, 0.65, 0.06]} /><meshStandardMaterial color="#1a1d24" metalness={0.5} roughness={0.4} /></mesh>
-      <mesh position={[0, 1.15, 0]}><boxGeometry args={[2.3, 1.32, 0.06]} /><meshStandardMaterial color="#111318" metalness={0.4} roughness={0.4} /></mesh>
+      <RoundedBox args={[0.7, 0.04, 0.35]} radius={0.012} position={[0, 0.02, 0]}><meshStandardMaterial color="#1a1d24" metalness={0.6} roughness={0.35} /></RoundedBox>
+      <mesh position={[0, 0.35, -0.05]}><boxGeometry args={[0.1, 0.65, 0.06]} /><meshStandardMaterial color="#1a1d24" metalness={0.6} roughness={0.35} /></mesh>
+      <RoundedBox args={[2.3, 1.32, 0.06]} radius={0.015} position={[0, 1.15, 0]}><meshStandardMaterial color="#111318" metalness={0.5} roughness={0.35} /></RoundedBox>
       <mesh position={[0, 1.15, 0.031]}>
         <planeGeometry args={[2.2, 1.24]} />
         <meshBasicMaterial map={screen.tex} toneMapped={false} />
@@ -699,7 +768,7 @@ export function RgbDriver() {
     const t = clock.elapsedTime
     RGB_MATS.forEach((m, i) => {
       HUE.setHSL((t * 0.08 + i * 0.14) % 1, 0.9, 0.55)
-      m.color.copy(DARK).lerp(HUE, S.rgb)
+      m.color.copy(DARK).lerp(HUE, S.rgb).multiplyScalar(1 + S.rgb) // > 1 so bloom picks it up
     })
     if (a.current) { a.current.color.setHSL((t * 0.08) % 1, 0.9, 0.55); a.current.intensity = S.rgb * 1.6 }
     if (b.current) { b.current.color.setHSL((t * 0.08 + 0.4) % 1, 0.9, 0.55); b.current.intensity = S.rgb * 1.6 }
