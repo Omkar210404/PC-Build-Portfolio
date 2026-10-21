@@ -3,7 +3,8 @@ import { Canvas } from '@react-three/fiber'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import Lenis from 'lenis'
-import Scene, { buildTimeline, sectionAt, type Section } from './Scene'
+import Scene, { SCROLL_VH, buildTimeline, sectionAt, type Section } from './Scene'
+import { V } from './Parts'
 import Overlay from './Overlay'
 import Simple from './Simple'
 import { person, visitorName } from './content'
@@ -69,10 +70,10 @@ function Experience({ name, touch, hasResume, onSkip }: {
   useLayoutEffect(() => {
     if (!track.current) return
     window.scrollTo(0, 0)
-    const lenis = new Lenis({ lerp: 0.09 })
+    const lenis = new Lenis({ lerp: 0.1 }) // the only smoothing layer; the timeline follows it 1:1
     lenisRef.current = lenis
     lenis.on('scroll', ScrollTrigger.update)
-    const tick = (time: number) => lenis.raf(time * 1000)
+    const tick = (time: number) => { lenis.raf(time * 1000); V.vel = lenis.velocity }
     gsap.ticker.add(tick)
     gsap.ticker.lagSmoothing(0)
 
@@ -127,12 +128,12 @@ function Experience({ name, touch, hasResume, onSkip }: {
             camera={{ fov: 40, near: 0.1, far: 40, position: [0, 1, 3.2] }}
             onPointerMissed={() => setActive(null)}
           >
-            <Scene name={name} touch={touch} active={active} onHover={onHover} onPick={setActive} onReady={onReady} />
+            <Scene name={name} touch={touch} section={section} active={active} onHover={onHover} onPick={setActive} onReady={onReady} />
           </Canvas>
         )}
       </div>
       <div className="vignette" />
-      <div ref={track} className="track" />
+      <div ref={track} className="track" style={{ height: `${SCROLL_VH}vh` }} />
       <Overlay
         section={section}
         active={active}

@@ -15,8 +15,6 @@ html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: v
 a { color: inherit; }
 button { font: inherit; cursor: pointer; }
 
-/* Scroll length of the whole story. Taller = slower story. */
-.track { height: 1000vh; }
 
 .stage { position: fixed; inset: 0; z-index: 0; }
 .vignette {
@@ -62,6 +60,16 @@ button { font: inherit; cursor: pointer; }
   font-family: var(--mono); color: var(--accent); font-size: 15px; animation: fade 0.6s ease;
 }
 @keyframes fade { from { opacity: 0; } }
+
+/* HUD callouts on the active 3D part: dot, thin line, label. Scroll length is SCROLL_VH in Scene.tsx. */
+.callout { position: relative; opacity: 0; transition: opacity 0.4s ease; font-family: var(--mono); }
+.callout.on { opacity: 1; }
+.callout i { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--accent); box-shadow: 0 0 10px var(--accent); }
+.callout b { position: absolute; left: 0; top: 0; width: 64px; height: 1px; background: linear-gradient(90deg, var(--accent), rgba(57, 255, 136, 0.3)); transform-origin: left; transform: rotate(-32deg); }
+.callout span {
+  position: absolute; left: 54px; top: -50px; white-space: nowrap; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink); padding: 3px 8px; border-left: 1px solid var(--accent); background: rgba(7, 11, 22, 0.6);
+}
 
 /* Section card (left side on desktop, bottom sheet on phones) */
 .card {

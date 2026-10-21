@@ -71,6 +71,11 @@ export const projects: Project[] = [
   },
 ]
 
+// HUD callout labels attached to the active part
+export const callouts = {
+  cpu: 'CPU · the core', ram: 'RAM · languages', gpu: 'GPU · AI/ML', ssd: 'M.2 · projects', power: 'PSU · SAP experience', boot: 'BIOS · contact',
+}
+
 // Section headings and captions
 export const sections = {
   hook: { title: 'Every part of this machine is a part of me.', text: 'Scroll to build it.' },
